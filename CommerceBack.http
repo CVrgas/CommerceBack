@@ -1,0 +1,6 @@
+@CommerceBack_HostAddress = http://localhost:5075
+
+GET {{CommerceBack_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
