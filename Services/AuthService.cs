@@ -77,7 +77,7 @@ namespace CommerceBack.Services
 
 		private int GetDefaultRole()
 		{
-			return _roleStore.Get(r => r.Name.Equals("guest", StringComparison.CurrentCultureIgnoreCase)).Id;
+			return _roleStore.Get(r => r.Name.Equals("user", StringComparison.CurrentCultureIgnoreCase)).Id;
 		}
 
 		public async Task<IReturnObject<UserDto>> LogIn(string credential, string password, bool remember = false)
