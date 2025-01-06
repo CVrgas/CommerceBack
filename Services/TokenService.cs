@@ -58,7 +58,7 @@ public class TokenService
             var result = await _tokens.Create(newToken);
             return !result.IsOk ? 
                 new ReturnObject<string>(result.IsOk, result.Message, result.Code) :
-                new ReturnObject<string>().Ok(tokenString);
+                new ReturnObject<string>().Ok(entity:tokenString);
         }
         catch (Exception ex)
         {
