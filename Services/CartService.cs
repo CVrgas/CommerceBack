@@ -26,8 +26,6 @@ public class CartService
     {
         try
         {
-            //TODO 
-            // Create enum for message for each type.
             var userExistsTask =  await _userService.Exist(userId);
             var productExistsTask =  await _productService.Exist(productId);
             
@@ -163,9 +161,9 @@ public class CartService
         try
         {
             Func<IQueryable<Cart>, IQueryable<Cart>>[] includes =
-            {
+            [
                 u => u.Include(c => c.CartProducts).ThenInclude( cp => cp.Products)
-            };
+            ];
             var result = await _cartService.Get(cart => cart.UserId == userId, includes);
             return result;
         }
