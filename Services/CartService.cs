@@ -28,12 +28,11 @@ public class CartService
         {
             //TODO 
             // Create enum for message for each type.
-            var userExistsTask = _userService.Exist(userId);
-            var productExistsTask = _productService.Exist(productId);
-            await Task.WhenAll(userExistsTask, productExistsTask);
+            var userExistsTask =  await _userService.Exist(userId);
+            var productExistsTask =  await _productService.Exist(productId);
             
-            if(!await userExistsTask) return new ReturnObject().NotFound("user not found");
-            if(!await productExistsTask) return new ReturnObject().NotFound("product not found");
+            if(!userExistsTask) return new ReturnObject().NotFound("user not found");
+            if(!productExistsTask) return new ReturnObject().NotFound("product not found");
             
             var cartResult = await GetOrCreateCartId(userId);
             
@@ -157,5 +156,23 @@ public class CartService
             .Where(c => c.UserId == userId)
             .Select(c => c.Id)
             .FirstOrDefaultAsync();
+    }
+
+    public async Task<IReturnObject<Cart>> Get(int userId)
+    {
+        try
+        {
+            Func<IQueryable<Cart>, IQueryable<Cart>>[] includes =
+            {
+                u => u.Include(c => c.CartProducts).ThenInclude( cp => cp.Products)
+            };
+            var result = await _cartService.Get(cart => cart.UserId == userId, includes);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get cart for user: {UserId}", userId);
+            return new ReturnObject<Cart>().NotFound();
+        }
     }
 }
