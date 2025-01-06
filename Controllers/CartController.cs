@@ -1,4 +1,7 @@
+using AutoMapper;
 using CommerceBack.Common.OperationResults;
+using CommerceBack.DTOs.Product;
+using CommerceBack.Entities;
 using CommerceBack.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,11 +15,13 @@ public class CartController : Controller
     
     private readonly CartService _cartService;
     private readonly AuthService _authService;
+    private readonly IMapper _mapper;
     
-    public CartController(CartService cartService, AuthService authService)
+    public CartController(CartService cartService, AuthService authService, IMapper mapper)
     {
         _cartService = cartService;
         _authService = authService;
+        _mapper = mapper;
     }
 
     [Authorize]
@@ -64,6 +69,20 @@ public class CartController : Controller
         
         var result = await _cartService.DecreaseQuantity(userId, productId, quantity);
         return StatusCode((int)result.Code, result.Message);
+    }
+
+    [Authorize]
+    [HttpGet("[action]")]
+    public async Task<IActionResult> GetCartItems()
+    {
+        var userIdResult = GetUserId();
+        
+        var cart = await _cartService.Get(userIdResult.Entity);
+        if(!cart.IsOk) return StatusCode((int)userIdResult.Code, userIdResult.Message);
+        
+        var products = cart.Entity?.CartProducts.Select( cp => _mapper.Map<ProductDto>(cp.Products));
+        
+        return StatusCode((int)cart.Code, products);
     }
 
     private IReturnObject<int> GetUserId()
