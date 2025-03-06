@@ -9,8 +9,8 @@ using Microsoft.OpenApi.Models;
 using System.Text;
 using CommerceBack;
 using CommerceBack.Context;
-using CommerceBack.Entities;
 using CommerceBack.Services.Base;
+using CommerceBack.UnitOfWork;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -86,6 +86,8 @@ builder.Services.AddSingleton<Jwt>(provider =>
 
 
 builder.Services.AddScoped(typeof(IEntityStore<>), typeof(EntityStore<>));
+
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 builder.Services.AddHttpContextAccessor();
 
