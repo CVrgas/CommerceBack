@@ -85,7 +85,7 @@ builder.Services.AddSingleton<Jwt>(provider =>
 });
 
 
-builder.Services.AddScoped(typeof(IEntityStore<>), typeof(EntityStore<>));
+builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
