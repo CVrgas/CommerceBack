@@ -1,13 +1,11 @@
-using CommerceBack.Common.OperationResults;
-using CommerceBack.Entities;
-using CommerceBack.Repository;
+using CommerceBack.UnitOfWork;
 
 namespace CommerceBack.Services.Base;
 
 public class ConcreteService<T> : ServiceBase<T> where T : class
 {
-    public ConcreteService(ILogger<ServiceBase<T>> logger, IEntityStore<T> store) 
-        : base(logger, store) 
+    public ConcreteService(ILogger<ServiceBase<T>> logger, IUnitOfWork unitOfWork) 
+        : base(logger, unitOfWork) 
     { 
     }
 }

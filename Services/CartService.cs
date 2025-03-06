@@ -1,6 +1,7 @@
 using CommerceBack.Common.OperationResults;
 using CommerceBack.Entities;
 using CommerceBack.Services.Base;
+using CommerceBack.UnitOfWork;
 using Microsoft.EntityFrameworkCore;
 
 namespace CommerceBack.Services;
@@ -11,17 +12,19 @@ public class CartService
     private readonly ConcreteService<Product> _productService;
     private readonly ConcreteService<CartProduct> _cartProductService;
     private readonly ConcreteService<User> _userService;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<CartService> _logger;
     
-    
-    public CartService(ConcreteService<Cart> cartService, ConcreteService<CartProduct> cartProductService, ConcreteService<User> userService, ILogger<CartService> logger, ConcreteService<Product> productService)
+    public CartService(ConcreteService<Cart> cartService, ConcreteService<CartProduct> cartProductService, ConcreteService<User> userService, ILogger<CartService> logger, ConcreteService<Product> productService, IUnitOfWork unitOfWork)
     {
         _cartService = cartService;
         _cartProductService = cartProductService;
         _userService = userService;
         _logger = logger;
         _productService = productService;
+        _unitOfWork = unitOfWork;
     }
+    
     public async Task<IReturnObject> AddItemToCart(int userId, int productId, int quantity = 1)
     {
         try
@@ -53,7 +56,7 @@ public class CartService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error in adding item to Cart, cartId: {userId}, productId: {productId}, quantity: {quantity}");
+            _logger.LogError(ex, $"Error in adding item to Cart, userId: {userId}, productId: {productId}, quantity: {quantity}");
             return new ReturnObject().InternalError("Error in adding item to Cart");
         }
     }
@@ -149,18 +152,13 @@ public class CartService
     }
     private async Task<int> GetCartByUserId(int userId)
     {
-        return await _cartService
-            .Query()
-            .Where(c => c.UserId == userId)
-            .Select(c => c.Id)
-            .FirstOrDefaultAsync();
+        return (await _cartService.Get(c => c.UserId == userId)).Entity?.Id ?? 0;
     }
-
     public async Task<IReturnObject<Cart>> Get(int userId)
     {
         try
         {
-            Func<IQueryable<Cart>, IQueryable<Cart>>[] includes =
+            Func<IQueryable<Cart>, IQueryable<Cart>>[]? includes =
             [
                 u => u.Include(c => c.CartProducts).ThenInclude( cp => cp.Products)
             ];

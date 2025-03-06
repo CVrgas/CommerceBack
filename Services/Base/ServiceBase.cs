@@ -1,7 +1,7 @@
 using System.Linq.Expressions;
 using CommerceBack.Common;
 using CommerceBack.Common.OperationResults;
-using CommerceBack.Repository;
+using CommerceBack.UnitOfWork;
 
 namespace CommerceBack.Services.Base;
 
@@ -9,20 +9,20 @@ public abstract class ServiceBase<T> : IServiceBase<T>
     where T : class
 {
     private readonly ILogger<ServiceBase<T>> _logger;
-    private readonly IEntityStore<T> _store;
+    private readonly IUnitOfWork _unitOfWork;
 
-    protected ServiceBase(ILogger<ServiceBase<T>> logger, IEntityStore<T> store)
+    protected ServiceBase(ILogger<ServiceBase<T>> logger, IUnitOfWork unitOfWork)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
     }
     
 
-    public virtual async Task<IReturnObject<T>> Get(int id, Func<IQueryable<T>, IQueryable<T>>[] includes = null!)
+    public virtual async Task<IReturnObject<T>> Get(int id, Func<IQueryable<T>, IQueryable<T>>[]? includes = null!)
     {
         try
         {
-            var entity = await _store.Get(id, includes);
+            var entity = await _unitOfWork.Repository<T>().Get(id, includes);
             return entity == null ? new ReturnObject<T>().NotFound() : new ReturnObject<T>().Ok(entity: entity);
         }
         catch (Exception ex)
@@ -32,11 +32,11 @@ public abstract class ServiceBase<T> : IServiceBase<T>
         }
     }
 
-    public virtual async Task<IReturnObject<T>> Get(Expression<Func<T, bool>> predicate, Func<IQueryable<T>, IQueryable<T>>[] includes = null!)
+    public virtual async Task<IReturnObject<T>> Get(Expression<Func<T, bool>> predicate, Func<IQueryable<T>, IQueryable<T>>[]? includes = null!)
     {
         try
         {
-            var entity = await _store.Get(predicate, includes);
+            var entity = await _unitOfWork.Repository<T>().Get(predicate, includes);
             return entity == null ? new ReturnObject<T>().NotFound() : new ReturnObject<T>().Ok(entity: entity);
         }
         catch (Exception ex)
@@ -50,7 +50,7 @@ public abstract class ServiceBase<T> : IServiceBase<T>
     {
         try
         {
-            var objects = await _store.All(predicate, orderBy, includes);
+            var objects = await _unitOfWork.Repository<T>().All(predicate, orderBy, includes);
             return new ReturnObject<IEnumerable<T>>().Ok(objects);
         }
         catch (Exception ex)
@@ -66,7 +66,7 @@ public abstract class ServiceBase<T> : IServiceBase<T>
     {
         try
         {
-            var paginated = await _store.GetPagianted(pageIndex, pageSize, predicate, orderBy, includes);
+            var paginated = await _unitOfWork.Repository<T>().GetPagianted(pageIndex, pageSize, predicate, orderBy, includes);
             return new ReturnObject<PaginatedResponse<T>>().Ok(paginated);
         }
         catch (Exception ex)
@@ -81,7 +81,7 @@ public abstract class ServiceBase<T> : IServiceBase<T>
         try
         {
             predicate ??= _ => true;
-            var count = _store.Count(predicate);
+            var count = _unitOfWork.Repository<T>().Count(predicate);
             return new ReturnObject<int>().Ok(count);
         }
         catch (Exception e)
@@ -95,7 +95,7 @@ public abstract class ServiceBase<T> : IServiceBase<T>
     {
         try
         {
-            return await _store.Exists(predicate);
+            return await _unitOfWork.Repository<T>().Exists(predicate);
         }
         catch (Exception ex)
         {
@@ -108,7 +108,7 @@ public abstract class ServiceBase<T> : IServiceBase<T>
     {
         try
         {
-            return await _store.Exists(id);
+            return await _unitOfWork.Repository<T>().Exists(id);
         }
         catch (Exception ex)
         {
@@ -120,6 +120,7 @@ public abstract class ServiceBase<T> : IServiceBase<T>
 
     public virtual async Task<IReturnObject<T>> Create(T entity)
     {
+        await _unitOfWork.BeginTransactionAsync();
         try
         {
             var exists = await this.Exist(e => e.Equals(entity));
@@ -128,7 +129,8 @@ public abstract class ServiceBase<T> : IServiceBase<T>
                 return new ReturnObject<T>().BadRequest("Entity already exists");
             }
 
-            var createdEntity = await _store.Create(entity);
+            var createdEntity = await _unitOfWork.Repository<T>().Create(entity);
+            await _unitOfWork.CommitAsync();
 
             return createdEntity != null
                 ? new ReturnObject<T>().Ok(createdEntity)
@@ -137,6 +139,7 @@ public abstract class ServiceBase<T> : IServiceBase<T>
         catch (Exception ex)
         {
             _logger.LogError(ex, "An error occurred while creating the entity");
+            await _unitOfWork.RollbackAsync();
             return new ReturnObject<T>().InternalError("An error occurred while creating the entity");
         }
     }
@@ -146,7 +149,7 @@ public abstract class ServiceBase<T> : IServiceBase<T>
     {
         try
         {
-            var createdEntities = await _store.CreateRange(entity);
+            var createdEntities = await _unitOfWork.Repository<T>().CreateRange(entity);
             return new ReturnObject<IEnumerable<T>>().Ok(createdEntities);
         }
         catch (Exception ex)
@@ -161,7 +164,7 @@ public abstract class ServiceBase<T> : IServiceBase<T>
     {
         try
         {
-            var createdEntity = await _store.Update(entity);
+            var createdEntity = await _unitOfWork.Repository<T>().Update(entity);
 
             return createdEntity != null ? new ReturnObject<T>().Ok(createdEntity) : new ReturnObject<T>().BadRequest();
         }
@@ -190,7 +193,7 @@ public abstract class ServiceBase<T> : IServiceBase<T>
                 .Where(result => result.Exists)
                 .Select(result => result.Entity);
             
-            var createdEntities = await _store.CreateRange(validEntities);
+            var createdEntities = await _unitOfWork.Repository<T>().CreateRange(validEntities);
             return new ReturnObject<IEnumerable<T>>().Ok(createdEntities);
         }
         catch (Exception ex)
@@ -204,7 +207,7 @@ public abstract class ServiceBase<T> : IServiceBase<T>
     {
         try
         {
-            var entity = await _store.Get(id);
+            var entity = await _unitOfWork.Repository<T>().Get(id);
             if (entity == null) return new ReturnObject<T>().NotFound();
             return await Delete(entity);
         }
@@ -222,7 +225,7 @@ public abstract class ServiceBase<T> : IServiceBase<T>
             var primaryKeyValue = GetPrimaryKeyValue(entity);
             var exists = primaryKeyValue is int id && await Exist(id);
             if (!exists) return new ReturnObject<T>().NotFound("Entity does not exist");
-            await _store.Delete(entity);
+            await _unitOfWork.Repository<T>().Delete(entity);
             return new ReturnObject<T>().Ok();
         }
         catch (Exception ex)
@@ -237,7 +240,7 @@ public abstract class ServiceBase<T> : IServiceBase<T>
     {
         try
         {
-            await _store.DeleteRange(entity);
+            await _unitOfWork.Repository<T>().DeleteRange(entity);
             return new ReturnObject<IEnumerable<T>>().Ok();
         }
         catch (Exception e)
@@ -245,11 +248,6 @@ public abstract class ServiceBase<T> : IServiceBase<T>
             _logger.LogError(e, "An error occurred while deleting the entities");
             return new ReturnObject<IEnumerable<T>>().InternalError("An error occurred while deleting the entities");
         }
-    }
-
-    public virtual IQueryable<T> Query()
-    {
-        return _store.Querable();
     }
     
     private object? GetPrimaryKeyValue(T entity)

@@ -3,18 +3,19 @@ using System.Linq.Expressions;
 using CommerceBack.Common.OperationResults;
 using CommerceBack.Entities;
 using CommerceBack.Services.Base;
+using CommerceBack.UnitOfWork;
 using Microsoft.EntityFrameworkCore;
 
 namespace CommerceBack.Services
 {
 	public class UserService : ServiceBase<User>
 	{
-		private readonly IEntityStore<User> _store;
+		private readonly IUnitOfWork _unitOfWork;
 		private readonly ILogger<UserService> _logger;
 
-		public UserService(IEntityStore<User> store, ILogger<UserService> logger) : base(logger, store)
+		public UserService(IUnitOfWork unitOfWork, ILogger<UserService> logger) : base(logger, unitOfWork)
 		{
-			_store = store ?? throw new ArgumentNullException(nameof(store));
+			_unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
 			_logger = logger ?? throw new ArgumentNullException(nameof(logger));
 		}
 
@@ -34,7 +35,7 @@ namespace CommerceBack.Services
 			{
 				if (entity == null) return new ReturnObject<User>().BadRequest("Invalid object");
 
-				var exist = await _store.Exists(p => p.Username == entity.Username || p.Email == entity.Email);
+				var exist = await _unitOfWork.Repository<User>().Exists(p => p.Username == entity.Username || p.Email == entity.Email);
 
 				if (exist) return new ReturnObject<User>().BadRequest("Product already exists");
 				
@@ -42,7 +43,7 @@ namespace CommerceBack.Services
 				entity.LastAccessDate = DateTime.UtcNow;
 				entity.CartNavigation = new Cart() { User = entity};
 
-				var createdUser = await _store.Create(entity);
+				var createdUser = await _unitOfWork.Repository<User>().Create(entity);
 
 				return new ReturnObject<User>().Ok(createdUser);
 			}
@@ -53,15 +54,15 @@ namespace CommerceBack.Services
 		}
 		public Task<bool> ExistsAsync(Expression<Func<User, bool>> predicate)
 		{
-			return _store.Exists(predicate);
+			return _unitOfWork.Repository<User>().Exists(predicate);
 		}
 		public async Task<IReturnObject<User>> GetAsync(int id)
 		{
 			try
 			{
 				if (id == 0) return new ReturnObject<User>().BadRequest("No id provided");
-				if (_store == null) return new ReturnObject<User>().InternalError("Data store not initialized.");
-				var user = await _store.Get(id);
+				if (_unitOfWork == null) return new ReturnObject<User>().InternalError("Data store not initialized.");
+				var user = await _unitOfWork.Repository<User>().Get(id);
 
 				if (user == null) return new ReturnObject<User>().NotFound();
 
@@ -77,7 +78,7 @@ namespace CommerceBack.Services
 		{
 			try
 			{
-				var user = await _store.Get(predicate);
+				var user = await _unitOfWork.Repository<User>().Get(predicate);
 
 				if (user == null) return new ReturnObject<User>().NotFound();
 
@@ -95,11 +96,11 @@ namespace CommerceBack.Services
 			{
 				if (entity.Id == 0) return new ReturnObject<User>().BadRequest("Invalid product");
 
-				var exist = await _store.Exists(entity.Id);
+				var exist = await _unitOfWork.Repository<User>().Exists(entity.Id);
 
 				if (!exist) return new ReturnObject<User>().NotFound();
 
-				var udpated = await _store.Update(entity);
+				var udpated = await _unitOfWork.Repository<User>().Update(entity);
 
 				return new ReturnObject<User>().Ok(udpated);
 			}

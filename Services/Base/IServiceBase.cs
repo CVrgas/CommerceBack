@@ -6,10 +6,10 @@ namespace CommerceBack.Services.Base;
 
 public interface IServiceBase<T> where T : class
 {
-    Task<IReturnObject<T>> Get(int id, Func<IQueryable<T>, IQueryable<T>>[] includes = null!);
+    Task<IReturnObject<T>> Get(int id, Func<IQueryable<T>, IQueryable<T>>[]? includes = null!);
 
     Task<IReturnObject<T>> Get(Expression<Func<T, bool>> predicate,
-        Func<IQueryable<T>, IQueryable<T>>[] includes = null!);
+        Func<IQueryable<T>, IQueryable<T>>[]? includes = null!);
 
     Task<IReturnObject<IEnumerable<T>>> All(Expression<Func<T, bool>>? predicate = null,
         Expression<Func<T, object>>? orderBy = null, Func<IQueryable<T>, IQueryable<T>>[]? includes = null);
@@ -35,6 +35,4 @@ public interface IServiceBase<T> where T : class
     Task<IReturnObject<T>> Delete(T entity);
     
     Task<IReturnObject<IEnumerable<T>>> BulkDelete(IEnumerable<T> entity);
-    
-    IQueryable<T> Query();
 }

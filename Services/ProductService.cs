@@ -5,21 +5,20 @@ using CommerceBack.Common.OperationResults;
 using CommerceBack.DTOs.Product;
 using CommerceBack.Entities;
 using CommerceBack.Services.Base;
+using CommerceBack.UnitOfWork;
 using Microsoft.EntityFrameworkCore;
 
 namespace CommerceBack.Services
 {
     public class ProductService : ServiceBase<Product>
     {
-        private readonly IEntityStore<ProductCategory> _productCategoryStore;
-        private readonly IEntityStore<Product> _store;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<ProductService> _logger;
         
-        public ProductService(IEntityStore<Product> store, ILogger<ProductService> logger, IEntityStore<ProductCategory> productCategoryStore) : base(logger, store)
+        public ProductService(IUnitOfWork unitOfWork, ILogger<ProductService> logger) : base(logger, unitOfWork)
         {
-            _store = store;
+            _unitOfWork = unitOfWork;
             _logger = logger;
-            _productCategoryStore = productCategoryStore;
         }
         
         public async Task<IReturnObject<IEnumerable<Product>>> All(string? query, string? orderBy, string? direction, IEnumerable<string>? includes)
@@ -84,7 +83,7 @@ namespace CommerceBack.Services
         {
             try
             {
-                var product = await _store.Get(id);
+                var product = await _unitOfWork.Repository<Product>().Get(id);
         
                 if (product == null) return new ReturnObject<ProductDto>().NotFound("Product not found");
         
@@ -92,7 +91,7 @@ namespace CommerceBack.Services
         
                 product.Disabled = false;
         
-                var updated = await _store.Update(product);
+                var updated = await _unitOfWork.Repository<Product>().Update(product);
                         
                 return updated != null ?  new ReturnObject<ProductDto>().Ok(MapToDto(updated)) : new ReturnObject<ProductDto>().BadRequest("Product not updated");
         
@@ -106,13 +105,13 @@ namespace CommerceBack.Services
         {
             try
             {
-                var storedProduct = await _store.Get(id);
+                var storedProduct = await _unitOfWork.Repository<Product>().Get(id);
         
                 if (storedProduct == null) return new ReturnObject<ProductDto>().NotFound("product not found");
         
                 storedProduct.Disabled = true;
         
-                var product = await _store.Update(storedProduct);
+                var product = await _unitOfWork.Repository<Product>().Update(storedProduct);
                         
                 return product == null ? new ReturnObject<ProductDto>().BadRequest("Product not updated") : new ReturnObject<ProductDto>().Ok(MapToDto(product));
             }
@@ -129,7 +128,7 @@ namespace CommerceBack.Services
         
             try
             {
-                var product = await _store.Get(productId);
+                var product = await _unitOfWork.Repository<Product>().Get(productId);
         
                 if(product == null) return new ReturnObject<decimal>().NotFound();
         
@@ -139,7 +138,7 @@ namespace CommerceBack.Services
         
                 product.Rating = averageRating;
         
-                var updated = await _store.Update(product);
+                var updated = await _unitOfWork.Repository<Product>().Update(product);
                 return updated != null ?
                     new ReturnObject<decimal>().Ok(Math.Round(averageRating, 2)) :
                     new ReturnObject<decimal>().BadRequest();
@@ -156,10 +155,10 @@ namespace CommerceBack.Services
 
             try
             {
-                var productExist = await _store.Exists(p => p.Name.ToLower() == newProduct.Name.ToLower());
+                var productExist = await _unitOfWork.Repository<Product>().Exists(p => p.Name.ToLower() == newProduct.Name.ToLower());
                 if(productExist) return new ReturnObject<Product>().BadRequest("Product already exists");
                 
-                var category = await _productCategoryStore.Get(pc => pc.Id == newProduct.Category);
+                var category = await _unitOfWork.Repository<ProductCategory>().Get(pc => pc.Id == newProduct.Category);
                 if(category == null) return new ReturnObject<Product>().BadRequest("Category not found");
 
                 var product = new Product()
@@ -189,10 +188,10 @@ namespace CommerceBack.Services
             {
                 if(newProduct.Any(newp => newp.Category <= 0)) return new ReturnObject<IEnumerable<Product>>().BadRequest($"Category missing on {newProduct.FirstOrDefault(newp => newp.Category <= 0)!.Name}");
                 
-                var existedProduct = await _store.Get(p => newProduct.Select(newp => newp.Name.ToLower()).Contains(p.Name.ToLower()));
+                var existedProduct = await _unitOfWork.Repository<Product>().Get(p => newProduct.Select(newp => newp.Name.ToLower()).Contains(p.Name.ToLower()));
                 if(existedProduct != null) return new ReturnObject<IEnumerable<Product>>().BadRequest($"Product already exists, {existedProduct.Name}");
                 
-                var categories = await _productCategoryStore.All(pc => newProduct.Select(newp => newp.Category).Contains(pc.Id));
+                var categories = await _unitOfWork.Repository<ProductCategory>().All(pc => newProduct.Select(newp => newp.Category).Contains(pc.Id));
                 
                 if(!categories.Any()) return new ReturnObject<IEnumerable<Product>>().InternalError($"Error occured while adding new products");
                 

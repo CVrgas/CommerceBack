@@ -6,6 +6,7 @@ using System.Security.Claims;
 using System.Text.RegularExpressions;
 using CommerceBack.Common.OperationResults;
 using CommerceBack.Entities;
+using CommerceBack.UnitOfWork;
 using Microsoft.EntityFrameworkCore;
 using Role = CommerceBack.Entities.Role;
 
@@ -14,8 +15,7 @@ namespace CommerceBack.Services
 	public class AuthService
 	{
 		//private readonly IEntityStore<PasswordResetCode> _store;
-		private readonly IEntityStore<Token> _tokenStore;
-		private readonly IEntityStore<Role> _roleStore;
+		private readonly IUnitOfWork _unitOfWork;
 		private readonly UserService _userService;
 		private readonly TokenService _tokenService;
 		private readonly Jwt _jwt;
@@ -23,14 +23,13 @@ namespace CommerceBack.Services
 		private static readonly Random Random = new Random();
 		private const int MaxAccessAttempts = 5;
 
-		public AuthService(UserService userService, Jwt jwt, ILogger<AuthService> logger, IEntityStore<Role> roleStore, TokenService tokenService, IEntityStore<Token> tokenStore)
+		public AuthService(UserService userService, Jwt jwt, ILogger<AuthService> logger, TokenService tokenService, IUnitOfWork unitOfWork)
 		{
 			_userService = userService;
 			_jwt = jwt;
-			_logger = logger;
-			_roleStore = roleStore;
+			_logger = logger;	
 			_tokenService = tokenService;
-			_tokenStore = tokenStore;
+			_unitOfWork = unitOfWork;
 		}
 
 		public async Task<IReturnObject<User>> SignUp(string username, string email, string password)
@@ -77,7 +76,7 @@ namespace CommerceBack.Services
 
 		private int GetDefaultRole()
 		{
-			return _roleStore.Get(r => r.Name.Equals("user", StringComparison.CurrentCultureIgnoreCase)).Id;
+			return _unitOfWork.Repository<Role>().Get(r => r.Name.Equals("user", StringComparison.CurrentCultureIgnoreCase)).Id;
 		}
 
 		public async Task<IReturnObject<UserDto>> LogIn(string credential, string password, bool remember = false)
@@ -190,7 +189,7 @@ namespace CommerceBack.Services
 
 		public async Task<IReturnObject<bool>> ResetPassword(string token, string newPassword)
 		{
-			await using var transaction = _tokenStore.Transaction();
+			await _unitOfWork.BeginTransactionAsync();
 			try
 			{
 				var (prc, user) = await ValidateResetToken(token);
@@ -204,16 +203,16 @@ namespace CommerceBack.Services
 				prc.Status = 2;
 
 				await _userService.UpdateAsync(user);
-				await _tokenStore.Update(prc);
+				await _unitOfWork.Repository<Token>().Update(prc);
 
 				// Commit the transaction
-				await transaction.CommitAsync();
+				await _unitOfWork.CommitAsync();
 
 				return new ReturnObject<bool>().Ok();
 			}
 			catch (Exception ex)
 			{
-				await transaction.RollbackAsync();
+				await _unitOfWork.RollbackAsync();
 				_logger.LogError(ex, $"Resetting password, token {token}");
 				return new ReturnObject<bool>().InternalError("Error Curred while Resetting password");
 			}
@@ -221,7 +220,7 @@ namespace CommerceBack.Services
 
 		private async Task<(Token? prc, User? user)> ValidateResetToken(string token)
 		{
-			var prc = await _tokenStore.Get(prc => prc.Value == token);
+			var prc = await _unitOfWork.Repository<Token>().Get(prc => prc.Value == token);
 
 			if (prc is not { Status: 1 } || prc.Expiration < DateTime.UtcNow) return (null, null);
 
