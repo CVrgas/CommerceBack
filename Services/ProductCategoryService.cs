@@ -5,9 +5,9 @@ using CommerceBack.UnitOfWork;
 
 namespace CommerceBack.Services;
 
-public class ProductCategoryService : ServiceBase<ProductCategory>
+public class ProductCategoryService : CrudService<ProductCategory>
 {
-    public ProductCategoryService(ILogger<ServiceBase<ProductCategory>> logger, IUnitOfWork unitOfWork) : base(logger, unitOfWork)
+    public ProductCategoryService(ILogger<ProductCategoryService> logger, IUnitOfWork unitOfWork) : base(logger, unitOfWork)
     {
     }
 }
