@@ -34,17 +34,19 @@ namespace CommerceBack.Services
 
 		public async Task<IReturnObject<User>> SignUp(string username, string email, string password)
 		{
+			await _unitOfWork.BeginTransactionAsync();
+			
 			try
 			{
 				if(!IsValidEmail(email)) return new ReturnObject<User>().BadRequest($"{email} is not a valid email.");
 				if(!IsValidPassword(password)) return new ReturnObject<User>().BadRequest($"{password} is not a valid password.");
 				if (!IsValidUsername(username)) return new ReturnObject<User>().BadRequest($"{username} is not a valid username.");
-				var emailExist = await _userService.ExistsAsync(u => u.Email == email);
-				var usernameExist = await _userService.ExistsAsync(u => u.Username == username);
+				var emailExist = await _userService.Exist(u => u.Email == email);
+				var usernameExist = await _userService.Exist(u => u.Username == username);
 
 				if (emailExist || usernameExist)
 				{
-					string message = emailExist 
+					var message = emailExist 
 						? "The provided email address is already in use. Please use a different email." 
 						: "The username you entered is already taken. Please choose a different username.";
 
@@ -63,13 +65,19 @@ namespace CommerceBack.Services
 				};
 
 				// Save user to the database
-				var result = await _userService.CreateAsync(user);
+				user.CreationDate = DateTime.UtcNow;
+				user.LastAccessDate = DateTime.UtcNow;
+				user.CartNavigation = new Cart() { User = user};
+				
+				var result = await _userService.Create(user);
+				await _unitOfWork.CommitAsync();
 
 				return result.IsOk ? new ReturnObject<User>().Ok(user) : result;
 			}
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "SignUp Error");
+				await _unitOfWork.RollbackAsync();
 				return new ReturnObject<User>().InternalError();
 			}
 		}
@@ -123,7 +131,7 @@ namespace CommerceBack.Services
 					user.LastAccessDate = DateTime.UtcNow;
 					user.AccessAttempts = 0;
 
-					await _userService.UpdateAsync(user);
+					await _userService.Update(user);
 					return responseObject.Ok(new UserDto(user, tokenResult.Entity));
 				}
 				else
@@ -137,7 +145,7 @@ namespace CommerceBack.Services
 						message = "Too many attempts, account locked.";
 					}
 
-					await _userService.UpdateAsync(user);
+					await _userService.Update(user);
 					return responseObject.BadRequest(message);
 				}
 			}
@@ -169,7 +177,7 @@ namespace CommerceBack.Services
 		{
 			try
 			{
-				var userResult = await _userService.GetAsync(u => u.Email == email);
+				var userResult = await _userService.Get(u => u.Email == email);
 
 				if (!userResult.IsOk || userResult.Entity == null) return new ReturnObject<string>(userResult.IsOk, userResult.Message, userResult.Code);
 
@@ -202,7 +210,7 @@ namespace CommerceBack.Services
 				user.IsLocked = false;
 				prc.Status = 2;
 
-				await _userService.UpdateAsync(user);
+				await _userService.Update(user);
 				await _unitOfWork.Repository<Token>().Update(prc);
 
 				// Commit the transaction
@@ -224,7 +232,7 @@ namespace CommerceBack.Services
 
 			if (prc is not { Status: 1 } || prc.Expiration < DateTime.UtcNow) return (null, null);
 
-			var userResult = await _userService.GetAsync(prc.UserId);
+			var userResult = await _userService.GetById(prc.UserId);
 			if(!userResult.IsOk || userResult.Entity == null) return (null, null);
 
 			return (prc, userResult.Entity);
@@ -239,7 +247,7 @@ namespace CommerceBack.Services
 				{
 					return null;  // Log if needed: "Invalid or missing user ID claim."
 				}
-				var userResult = await _userService.GetAsync(userId);
+				var userResult = await _userService.GetById(userId);
 				return userResult.Entity;
 			}
 			catch (Exception ex)

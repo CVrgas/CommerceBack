@@ -18,7 +18,18 @@ namespace CommerceBack.Controllers
         [HttpGet]
         public async Task<IActionResult> All(string? query, string? orderby, string? orderDirection)
         {
-            var result = await service.All(query, orderby, orderDirection, []);
+            Expression<Func<Product, bool>> predicate =
+                !string.IsNullOrWhiteSpace(query)
+                    ? p => EF.Functions.Like(p.Name!.ToLower(), $"%{query.ToLower()}%") ||
+                           EF.Functions.Like(p.Description!.ToLower(), $"%{query.ToLower()}%") ||
+                           EF.Functions.Like( p.CategoryNavigation.Name!.ToLower().Replace(" ", ""), $"%{query.ToLower()}%")
+                    : p => true;
+            
+            Expression<Func<Product, object>> order = p => p.Name!;
+
+            Func<IQueryable<Product>, IQueryable<Product>>[]? inc = null;
+            
+            var result  = await service.GetAll(predicate, order, inc);
             return StatusCode((int)result.Code,
                 result.IsOk ? mapper.Map<IEnumerable<ProductDto>>(result.Entity) : result.Message);
         }
@@ -26,7 +37,7 @@ namespace CommerceBack.Controllers
         [HttpGet("{productId}")]
         public async Task<IActionResult> Get(int productId)
         {
-            var result = await service.Get(productId);
+            var result = await service.GetById(productId);
             return StatusCode((int)result.Code, result.IsOk ? mapper.Map<ProductDto>(result.Entity!) : result.Message);
         }
 
@@ -36,9 +47,17 @@ namespace CommerceBack.Controllers
         {
             try
             {
-                var result = await service.Paginated(pageIndex, pageSize, query, order);
-                var x = mapper.Map<PaginatedResponse<ProductDto>>(result.Entity);
-                return StatusCode((int)result.Code, result.IsOk ? x : result.Message);
+                Expression<Func<Product,bool>>? predicate  = p => (query != null && (p.Name.Contains(query) || p.Description.Contains(query)));
+                Expression<Func<Product, object>>? orderBy = order!.ToLower() switch {
+                    "name" => p => p.Name!,
+                    "description" => p => p.Description!,
+                    "price" => p => p.Price!,
+                    _ => p => p.Name!,
+                };
+                
+                var result = await service.GetPaginated(pageIndex, pageSize, predicate, orderBy, null);
+                var mapped = mapper.Map<PaginatedResponse<ProductDto>>(result.Entity);
+                return StatusCode((int)result.Code, result.IsOk ? mapped : result.Message);
             }
             catch (Exception ex)
             {
@@ -49,7 +68,7 @@ namespace CommerceBack.Controllers
         [HttpGet("[action]")]
         public IActionResult Count(string? query = null)
         {
-            var result = service.Count();
+            var result = service.GetCount();
             return StatusCode((int)result.Code, result.IsOk ? result.Entity : result.Message);
         }
 
@@ -61,8 +80,7 @@ namespace CommerceBack.Controllers
             {
                 return BadRequest();
             }
-
-            var result = await service.Create(model);
+            var result = await service.Create(mapper.Map<Product>(model));
             return StatusCode((int)result.Code, result.IsOk ? mapper.Map<ProductDto>(result.Entity) : result.Message);
         }
 
@@ -75,7 +93,7 @@ namespace CommerceBack.Controllers
                 return BadRequest();
             }
 
-            var result = await service.BulkCreate(models.ToList());
+            var result = await service.BulkCreate(mapper.Map<IEnumerable<Product>>(models));
             return StatusCode((int)result.Code,
                 result.IsOk ? mapper.Map<List<ProductDto>>(result.Entity) : result.Message);
         }
@@ -89,7 +107,7 @@ namespace CommerceBack.Controllers
                 return BadRequest();
             }
 
-            var productObject = await service.Get(model.Id);
+            var productObject = await service.GetById(model.Id);
 
             if (!productObject.IsOk) return StatusCode((int)productObject.Code, productObject.Message);
 
@@ -115,7 +133,7 @@ namespace CommerceBack.Controllers
             }
 
             var productIds = models.Select(p => p.Id).ToList();
-            var productsObject = await service.All(p => productIds.Contains(p.Id));
+            var productsObject = await service.GetAll(p => productIds.Contains(p.Id));
 
             if (!productsObject.IsOk)
                 return StatusCode((int)productsObject.Code, productsObject.Message);
