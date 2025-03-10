@@ -5,18 +5,17 @@ using CommerceBack.UnitOfWork;
 
 namespace CommerceBack.Services.Base;
 
-public abstract class ServiceBase<T> : IServiceBase<T>
+public class CrudService<T> : ICrudService<T>
     where T : class
 {
-    private readonly ILogger<ServiceBase<T>> _logger;
+    private readonly ILogger<CrudService<T>> _logger;
     private readonly IUnitOfWork _unitOfWork;
 
-    protected ServiceBase(ILogger<ServiceBase<T>> logger, IUnitOfWork unitOfWork)
+    protected CrudService(ILogger<CrudService<T>> logger, IUnitOfWork unitOfWork)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
     }
-    
 
     public virtual async Task<IReturnObject<T>> GetById(int id, Func<IQueryable<T>, IQueryable<T>>[]? includes = null!)
     {
@@ -32,7 +31,7 @@ public abstract class ServiceBase<T> : IServiceBase<T>
         }
     }
 
-    public virtual async Task<IReturnObject<T>> Get(Expression<Func<T, bool>> predicate, Func<IQueryable<T>, IQueryable<T>>[]? includes = null!)
+    public virtual async Task<IReturnObject<T>> Find(Expression<Func<T, bool>> predicate, Func<IQueryable<T>, IQueryable<T>>[]? includes = null!)
     {
         try
         {
@@ -163,7 +162,7 @@ public abstract class ServiceBase<T> : IServiceBase<T>
         {
             var createdEntity = await _unitOfWork.Repository<T>().Update(entity);
 
-            return createdEntity != null ? new ReturnObject<T>().Ok(createdEntity) : new ReturnObject<T>().BadRequest();
+            return new ReturnObject<T>().Ok(createdEntity);
         }
         catch (Exception ex)
         {
