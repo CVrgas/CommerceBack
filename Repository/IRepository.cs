@@ -9,12 +9,12 @@ namespace CommerceBack.Repository
 
         Task<IEnumerable<T>> CreateRange(IEnumerable<T> entities);
 
-        Task<T?> Get(int id, Func<IQueryable<T>, IQueryable<T>>[]? includes = null);
+        Task<T?> GetById(int id, Func<IQueryable<T>, IQueryable<T>>[]? includes = null);
 
         Task<T?> Get(Expression<Func<T, bool>> predicate, Func<IQueryable<T>, IQueryable<T>>[]? includes = null);
 
-        Task<IEnumerable<T>> All(Expression<Func<T, bool>>? predicate = null, Expression<Func<T, object>>? orderBy = null, Func<IQueryable<T>, IQueryable<T>>[]? includes = null);
-        Task<PaginatedResponse<T>> GetPagianted(int pageIndex, int pageSize, Expression<Func<T, bool>>? predicate = null, Expression<Func<T, object>>? orderBy = null, Func<IQueryable<T>, IQueryable<T>>[]? includes = null);
+        Task<IEnumerable<T>> GetAll(Expression<Func<T, bool>>? predicate = null, Expression<Func<T, object>>? orderBy = null, Func<IQueryable<T>, IQueryable<T>>[]? includes = null);
+        Task<PaginatedResponse<T>> GetPaginated(int pageIndex, int pageSize, Expression<Func<T, bool>>? predicate = null, Expression<Func<T, object>>? orderBy = null, Func<IQueryable<T>, IQueryable<T>>[]? includes = null);
 
         Task<T> Update(T entity);
 

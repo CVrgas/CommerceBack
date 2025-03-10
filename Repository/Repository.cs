@@ -53,7 +53,7 @@ namespace CommerceBack.Repository
             return Task.CompletedTask;
         }
 
-        public async Task<T?> Get(int id, Func<IQueryable<T>, IQueryable<T>>[]? includes = null)
+        public async Task<T?> GetById(int id, Func<IQueryable<T>, IQueryable<T>>[]? includes = null)
         {
             var keyProp = _dbContext.Model.FindEntityType(typeof(T))?.FindPrimaryKey()?.Properties.FirstOrDefault()?.Name;
 
@@ -81,7 +81,7 @@ namespace CommerceBack.Repository
             return await query.FirstOrDefaultAsync(predicate);
         }
 
-        public async Task<IEnumerable<T>> All(Expression<Func<T, bool>>? predicate = null, Expression<Func<T, object>>? orderBy = null, Func<IQueryable<T>, IQueryable<T>>[]? includes = null)
+        public async Task<IEnumerable<T>> GetAll(Expression<Func<T, bool>>? predicate = null, Expression<Func<T, object>>? orderBy = null, Func<IQueryable<T>, IQueryable<T>>[]? includes = null)
         {
             var query = _dbSet.AsQueryable();
 
@@ -150,7 +150,7 @@ namespace CommerceBack.Repository
             return await _dbSet.AnyAsync(e => EF.Property<int>(e, keyProp) == id);
         }
 
-        public async Task<PaginatedResponse<T>> GetPagianted(int pageIndex, int pageSize, Expression<Func<T, bool>>? predicate = null, Expression<Func<T, object>>? orderBy = null, Func<IQueryable<T>, IQueryable<T>>[]? includes = null)
+        public async Task<PaginatedResponse<T>> GetPaginated(int pageIndex, int pageSize, Expression<Func<T, bool>>? predicate = null, Expression<Func<T, object>>? orderBy = null, Func<IQueryable<T>, IQueryable<T>>[]? includes = null)
         {
             var query = _dbSet.AsQueryable();
 
