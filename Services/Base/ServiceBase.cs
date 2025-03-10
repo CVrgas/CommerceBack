@@ -18,11 +18,11 @@ public abstract class ServiceBase<T> : IServiceBase<T>
     }
     
 
-    public virtual async Task<IReturnObject<T>> Get(int id, Func<IQueryable<T>, IQueryable<T>>[]? includes = null!)
+    public virtual async Task<IReturnObject<T>> GetById(int id, Func<IQueryable<T>, IQueryable<T>>[]? includes = null!)
     {
         try
         {
-            var entity = await _unitOfWork.Repository<T>().Get(id, includes);
+            var entity = await _unitOfWork.Repository<T>().GetById(id, includes);
             return entity == null ? new ReturnObject<T>().NotFound() : new ReturnObject<T>().Ok(entity: entity);
         }
         catch (Exception ex)
@@ -46,11 +46,11 @@ public abstract class ServiceBase<T> : IServiceBase<T>
         }
     }
 
-    public virtual async Task<IReturnObject<IEnumerable<T>>> All(Expression<Func<T, bool>>? predicate = null, Expression<Func<T, object>>? orderBy = null, Func<IQueryable<T>, IQueryable<T>>[]? includes = null)
+    public virtual async Task<IReturnObject<IEnumerable<T>>> GetAll(Expression<Func<T, bool>>? predicate = null, Expression<Func<T, object>>? orderBy = null, Func<IQueryable<T>, IQueryable<T>>[]? includes = null)
     {
         try
         {
-            var objects = await _unitOfWork.Repository<T>().All(predicate, orderBy, includes);
+            var objects = await _unitOfWork.Repository<T>().GetAll(predicate, orderBy, includes);
             return new ReturnObject<IEnumerable<T>>().Ok(objects);
         }
         catch (Exception ex)
@@ -60,13 +60,13 @@ public abstract class ServiceBase<T> : IServiceBase<T>
         }
     }
     
-    public virtual async Task<IReturnObject<PaginatedResponse<T>>> Paginated(int pageIndex, int pageSize,
+    public virtual async Task<IReturnObject<PaginatedResponse<T>>> GetPaginated(int pageIndex, int pageSize,
         Expression<Func<T, bool>>? predicate = null, Expression<Func<T, object>>? orderBy = null,
         Func<IQueryable<T>, IQueryable<T>>[]? includes = null)
     {
         try
         {
-            var paginated = await _unitOfWork.Repository<T>().GetPagianted(pageIndex, pageSize, predicate, orderBy, includes);
+            var paginated = await _unitOfWork.Repository<T>().GetPaginated(pageIndex, pageSize, predicate, orderBy, includes);
             return new ReturnObject<PaginatedResponse<T>>().Ok(paginated);
         }
         catch (Exception ex)
@@ -76,7 +76,7 @@ public abstract class ServiceBase<T> : IServiceBase<T>
         }
     }
 
-    public virtual IReturnObject<int> Count(Expression<Func<T, bool>>? predicate = null)
+    public virtual IReturnObject<int> GetCount(Expression<Func<T, bool>>? predicate = null)
     {
         try
         {
@@ -117,7 +117,6 @@ public abstract class ServiceBase<T> : IServiceBase<T>
         }
     }
     
-
     public virtual async Task<IReturnObject<T>> Create(T entity)
     {
         await _unitOfWork.BeginTransactionAsync();
@@ -144,7 +143,6 @@ public abstract class ServiceBase<T> : IServiceBase<T>
         }
     }
     
-
     public virtual async Task<IReturnObject<IEnumerable<T>>> BulkCreate(IEnumerable<T> entity)
     {
         try
@@ -159,7 +157,6 @@ public abstract class ServiceBase<T> : IServiceBase<T>
         }
     }
     
-
     public virtual async Task<IReturnObject<T>> Update(T entity)
     {
         try
@@ -174,7 +171,6 @@ public abstract class ServiceBase<T> : IServiceBase<T>
             return new ReturnObject<T>().InternalError("An error occurred while updating the entity");
         }
     }
-    
     
     public virtual async Task<IReturnObject<IEnumerable<T>>> BulkUpdate(IEnumerable<T> entity)
     {
@@ -207,7 +203,7 @@ public abstract class ServiceBase<T> : IServiceBase<T>
     {
         try
         {
-            var entity = await _unitOfWork.Repository<T>().Get(id);
+            var entity = await _unitOfWork.Repository<T>().GetById(id);
             if (entity == null) return new ReturnObject<T>().NotFound();
             return await Delete(entity);
         }
@@ -234,7 +230,6 @@ public abstract class ServiceBase<T> : IServiceBase<T>
             return new ReturnObject<T>().InternalError("An error occurred while deleting the entity");
         }
     }
-    
     
     public virtual async Task<IReturnObject<IEnumerable<T>>> BulkDelete(IEnumerable<T> entity)
     {
