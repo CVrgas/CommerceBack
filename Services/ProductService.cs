@@ -7,7 +7,7 @@ using CommerceBack.UnitOfWork;
 
 namespace CommerceBack.Services
 {
-    public class ProductService : ServiceBase<Product>
+    public class ProductService : CrudService<Product>
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<ProductService> _logger;

@@ -10,6 +10,10 @@ using System.Text;
 using CommerceBack;
 using CommerceBack.Context;
 using CommerceBack.Services.Base;
+using CommerceBack.Services.Base.CreateService;
+using CommerceBack.Services.Base.DeleteService;
+using CommerceBack.Services.Base.ReadService;
+using CommerceBack.Services.Base.UpdateService;
 using CommerceBack.UnitOfWork;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -87,6 +91,13 @@ builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
+
+builder.Services.AddScoped(typeof(ICrudService<>), typeof(CrudService<>));
+builder.Services.AddScoped(typeof(ICreateService<>), typeof(CreateService<>));
+builder.Services.AddScoped(typeof(IReadService<>), typeof(ReadService<>));
+builder.Services.AddScoped(typeof(IUpdateService<>), typeof(UpdateService<>));
+builder.Services.AddScoped(typeof(IDeleteService<>), typeof(DeleteService<>));
+
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddScoped<ProductService>();
@@ -100,8 +111,6 @@ builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<CartService>();
 
 builder.Services.AddScoped<ProductCategoryService>();
-
-builder.Services.AddScoped(typeof(ConcreteService<>));
 
 builder.Services.AddScoped<TokenBlacklistService>();
 

@@ -1,34 +1,30 @@
-using System.Security.Claims;
 using CommerceBack.Common;
 using CommerceBack.Common.OperationResults;
 using CommerceBack.Entities;
-using CommerceBack.Repository;
 using CommerceBack.Services.Base;
 
 namespace CommerceBack.Services;
 
 public class TokenService
 {
-    private readonly ConcreteService<Token> _tokens;
-    public readonly ConcreteService<TokenType> Types;
-    public readonly ConcreteService<TokenStatus> Statuses;
+    private readonly ICrudService<Token> _tokens;
+    private readonly ICrudService<TokenType> _tokenType;
     private readonly Jwt _jwt;
     private readonly ILogger<TokenService> _logger;
 
-    public TokenService(Jwt jwt, ILogger<TokenService> logger1, ConcreteService<Token> tokens, ConcreteService<TokenType> types, ConcreteService<TokenStatus> statuses)
+    public TokenService(Jwt jwt, ILogger<TokenService> logger, ICrudService<Token> tokens, ICrudService<TokenType> tokenType)
     {
         _jwt = jwt;
-        _logger = logger1;
+        _logger = logger;
         _tokens = tokens;
-        Types = types;
-        Statuses = statuses;
+        _tokenType = tokenType;
     }
 
     public async Task<IReturnObject<string>> CreateToken(User user, string type, int status = 0)
     {
         try
         {
-            var tokenType = await Types.Get(t => t.Name!.ToLower() == type.ToLower());
+            var tokenType = await _tokenType.Find(t => t.Name.ToLower() == type.ToLower());
 
             if (!tokenType.IsOk) return new ReturnObject<string>(tokenType.IsOk, tokenType.Message, tokenType.Code);
 
@@ -46,15 +42,14 @@ public class TokenService
                 Expiration = DateTime.UtcNow.AddDays((double)tokenType.Entity!.TimeSpanDefault),
             };
             
-            var prevTokens = (await _tokens.All(t => t.UserId == user.Id && t.TokenType == newToken.TokenType)).Entity;
+            var prevTokens = (await _tokens.GetAll(t => t.UserId == user.Id && t.TokenType == newToken.TokenType)).Entity;
             if (prevTokens != null)
             {
                 var tokens = prevTokens.ToList();
                 tokens.ToList().ForEach(token => token.Status = 2);
                 await _tokens.BulkUpdate(tokens);
-            };
-
-
+            }
+            
             var result = await _tokens.Create(newToken);
             return !result.IsOk ? 
                 new ReturnObject<string>(result.IsOk, result.Message, result.Code) :
@@ -69,7 +64,7 @@ public class TokenService
 
     public async Task<IReturnObject<bool>> ValidateToken(string token, string type)
     {
-        var tokenType = await Types.Get(t => t.Name!.ToLower() == type.ToLower());
+        var tokenType = await _tokenType.Find(t => t.Name.ToLower() == type.ToLower());
         
         if(!tokenType.IsOk) return new ReturnObject<bool>(tokenType.IsOk, tokenType.Message, tokenType.Code);
         
@@ -78,7 +73,7 @@ public class TokenService
         
         if(result == null || jti == null) return new ReturnObject<bool>().NotFound();
 
-        var isValid = await _tokens.Get(t => t.Value == jti.Value && t.Status != 2);
+        var isValid = await _tokens.Find(t => t.Value == jti.Value && t.Status != 2);
         
         return isValid.IsOk ? new ReturnObject<bool>().Ok(true) : new ReturnObject<bool>().NotFound();
 
@@ -86,7 +81,7 @@ public class TokenService
 
     public async Task<IReturnObject<Token>> GetToken(User userResultEntity, int type = 1)
     {
-        return await _tokens.Get(t => t.UserId == userResultEntity.Id && t.TokenType == type);
+        return await _tokens.Find(t => t.UserId == userResultEntity.Id && t.TokenType == type);
     }
 }
 

@@ -8,21 +8,19 @@ namespace CommerceBack.Services;
 
 public class CartService
 {
-    private readonly ConcreteService<Cart> _cartService;
-    private readonly ConcreteService<Product> _productService;
-    private readonly ConcreteService<CartProduct> _cartProductService;
-    private readonly ConcreteService<User> _userService;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly ICrudService<Cart> _cartService;
+    private readonly ICrudService<Product> _productService;
+    private readonly ICrudService<CartProduct> _cartProductService;
+    private readonly IReadService<User> _userService;
     private readonly ILogger<CartService> _logger;
     
-    public CartService(ConcreteService<Cart> cartService, ConcreteService<CartProduct> cartProductService, ConcreteService<User> userService, ILogger<CartService> logger, ConcreteService<Product> productService, IUnitOfWork unitOfWork)
+    public CartService( ILogger<CartService> logger, ICrudService<Cart> cartService, ICrudService<Product> productService, ICrudService<CartProduct> cartProductService, ICrudService<User> userService)
     {
+        _logger = logger;
         _cartService = cartService;
+        _productService = productService;
         _cartProductService = cartProductService;
         _userService = userService;
-        _logger = logger;
-        _productService = productService;
-        _unitOfWork = unitOfWork;
     }
     
     public async Task<IReturnObject> AddItemToCart(int userId, int productId, int quantity = 1)
@@ -64,8 +62,9 @@ public class CartService
     {
         try
         {
-            if (!await ProductExistsInCart(cartItemId)) return new ReturnObject().NotFound();
-            await _cartProductService.Delete(cartItemId);
+            var result =  await _cartProductService.Find( cp => cp.Id == cartItemId);
+            if (!result.IsOk || result.Entity == null) return new ReturnObject().NotFound();
+            await _cartProductService.Delete(result.Entity);
             return new ReturnObject().Ok();
 
         }
@@ -79,7 +78,7 @@ public class CartService
     {
         try
         {
-            var cpResult = await _cartProductService.Get(cp => cp.CartId == cartId && cp.ProductsId == productId);
+            var cpResult = await _cartProductService.Find(cp => cp.CartId == cartId && cp.ProductsId == productId);
             if (!cpResult.IsOk) return new ReturnObject().NotFound();
             var cp = cpResult.Entity;
             cp!.Quantity += quantity;
@@ -96,7 +95,7 @@ public class CartService
     {
         try
         {
-            var cpResult = await _cartProductService.Get(cp => cp.CartId == cartId && cp.ProductsId == productId);
+            var cpResult = await _cartProductService.Find(cp => cp.CartId == cartId && cp.ProductsId == productId);
             if (!cpResult.IsOk) return new ReturnObject().NotFound();
             var cp = cpResult.Entity;
             cp!.Quantity -= quantity;
@@ -117,10 +116,6 @@ public class CartService
             _logger.LogError(ex, $"error decreasing quantity, cartId: {cartId}, productId: {productId}, quantity: {quantity}");
             return new ReturnObject().InternalError("error decreasing quantity");
         }
-    }
-    private async Task<bool> ProductExistsInCart(int cartItemId)
-    {
-        return await _cartProductService.Exist(cartItemId);
     }
     private async Task<bool> ProductExistsInCart(int cartId, int productId)
     {
@@ -152,7 +147,7 @@ public class CartService
     }
     private async Task<int> GetCartByUserId(int userId)
     {
-        return (await _cartService.Get(c => c.UserId == userId)).Entity?.Id ?? 0;
+        return (await _cartService.Find(c => c.UserId == userId)).Entity?.Id ?? 0;
     }
     public async Task<IReturnObject<Cart>> Get(int userId)
     {
@@ -162,7 +157,7 @@ public class CartService
             [
                 u => u.Include(c => c.CartProducts).ThenInclude( cp => cp.Products)
             ];
-            var result = await _cartService.Get(cart => cart.UserId == userId, includes);
+            var result = await _cartService.Find(cart => cart.UserId == userId, includes);
             return result;
         }
         catch (Exception ex)

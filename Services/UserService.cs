@@ -4,9 +4,9 @@ using CommerceBack.UnitOfWork;
 
 namespace CommerceBack.Services
 {
-	public class UserService : ServiceBase<User>
+	public class UserService : CrudService<User>
 	{
-		public UserService(IUnitOfWork unitOfWork, ILogger<UserService> logger) : base(logger, unitOfWork)
+		protected UserService(ILogger<CrudService<User>> logger, IUnitOfWork unitOfWork) : base(logger, unitOfWork)
 		{
 		}
 	}

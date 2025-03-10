@@ -1,8 +1,8 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using CommerceBack.Common;
 using CommerceBack.Entities;
-using CommerceBack.Services;
+using CommerceBack.Services.Base;
+using CommerceBack.Services.Base.CreateService;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CommerceBack.Controllers;
@@ -11,19 +11,19 @@ namespace CommerceBack.Controllers;
 [Route("api/[controller]")]
 public class TokenController : ControllerBase
 {
-    private readonly TokenService _tokenService;
-    private readonly UserService _userService;
+    private readonly ICreateService<TokenStatus> _tokenStatusService;
+    private readonly ICrudService<TokenType> _tokenTypeService;
 
-    public TokenController(TokenService tokenService, UserService userService)
+    public TokenController(ICrudService<TokenStatus> tokenStatusService, ICrudService<TokenType> tokenTypeService)
     {
-        _tokenService = tokenService ?? throw new ArgumentNullException(nameof(tokenService));
-        _userService = userService ?? throw new ArgumentNullException(nameof(userService));
+        _tokenStatusService = tokenStatusService;
+        _tokenTypeService = tokenTypeService;
     }
     
     [HttpGet("types")]
     public async Task<IActionResult> GetTypes()
     {
-        var result = await _tokenService.Types.All();
+        var result = await _tokenTypeService.GetAll();
         return  StatusCode((int)result.Code, result.IsOk ? result.Entity!.Select(t => t.Name).ToList() : result.Code);
     }
 
@@ -37,19 +37,19 @@ public class TokenController : ControllerBase
 
         var typeClass = new TokenType()
         {
-            Name = newType.Name,
+            Name = newType.Name!,
             StatusDefault = newType.StatusDefault,
             TimeSpanDefault = newType.TimeSpanDefault,
         };
         
-        var result = await _tokenService.Types.Create(typeClass);
+        var result = await _tokenTypeService.Create(typeClass);
         return StatusCode((int)result.Code, result.Message);
     }
     
     [HttpPost("[action]")]
     public async Task<IActionResult> CreateStatus(string name)
     {
-        var result = await _tokenService.Statuses.Create(new TokenStatus() { Name = name });
+        var result = await _tokenStatusService.Create(new TokenStatus() { Name = name });
         return StatusCode((int)result.Code, result.Message);
     }
 
