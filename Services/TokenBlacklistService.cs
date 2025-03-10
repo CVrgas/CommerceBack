@@ -2,7 +2,7 @@
 {
 	public class TokenBlacklistService
 	{
-		private HashSet<string> _blacklist = new HashSet<string>();
+		private readonly HashSet<string> _blacklist = [];
 
 		public bool IsTokenRevoked(string token)
 		{

@@ -40,7 +40,7 @@ builder.Services.AddSwaggerGen(c =>
 					Type = ReferenceType.SecurityScheme,
 					Id = "Bearer"
 				}
-			}, new string[] { }
+			}, []
 		}
 	});
 });
@@ -63,12 +63,11 @@ builder.Services.AddAuthentication(options =>
 		ValidateIssuerSigningKey = true,
 		ValidIssuer = builder.Configuration["Jwt:Issuer"],
 		ValidAudience = builder.Configuration["Jwt:Audience"],
-		IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:SecretKey"]))
+		IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:SecretKey"] ?? throw new InvalidOperationException()))
 	};
 });
 
-
-builder.Services.AddSingleton<Jwt>(provider =>
+builder.Services.AddSingleton<Jwt>(_ =>
 {
 	// You can read configuration values from your app settings here
 	var secretKey = builder.Configuration["Jwt:SecretKey"];
@@ -83,7 +82,6 @@ builder.Services.AddSingleton<Jwt>(provider =>
 	}
 	throw new InvalidOperationException("invalid properties");
 });
-
 
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 
@@ -105,8 +103,6 @@ builder.Services.AddScoped<ProductCategoryService>();
 
 builder.Services.AddScoped(typeof(ConcreteService<>));
 
-builder.Services.AddScoped<Test>();
-
 builder.Services.AddScoped<TokenBlacklistService>();
 
 builder.Services.AddScoped<JwtTokenValidationMiddleware>();
@@ -115,8 +111,8 @@ builder.Services.AddAutoMapper(typeof(MappingProfile));
 
 builder.Services.AddCors(options =>
 {
-	options.AddPolicy("All", builder => 
-		builder.AllowAnyOrigin()
+	options.AddPolicy("All", policy => 
+		policy.AllowAnyOrigin()
 			.AllowAnyMethod()
 			.AllowAnyHeader());
 	
