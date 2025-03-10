@@ -92,7 +92,7 @@ namespace CommerceBack.Services
 			try
 			{
 				// Get user using credential
-				var result = await _userService.Get(u => u.Email == credential || u.Username == credential, [
+				var result = await _userService.Find(u => u.Email == credential || u.Username == credential, [
 					query => query.Include(u => u.RoleNavigation)
 				]);
 				var responseObject = new ReturnObject<UserDto>();
@@ -177,7 +177,7 @@ namespace CommerceBack.Services
 		{
 			try
 			{
-				var userResult = await _userService.Get(u => u.Email == email);
+				var userResult = await _userService.Find(u => u.Email == email);
 
 				if (!userResult.IsOk || userResult.Entity == null) return new ReturnObject<string>(userResult.IsOk, userResult.Message, userResult.Code);
 
@@ -237,33 +237,14 @@ namespace CommerceBack.Services
 
 			return (prc, userResult.Entity);
 		}
-
-		private async Task<User?> ExtractUserFromClaim(ClaimsPrincipal claims)
-		{
-			try
-			{
-				var userIdClaim = claims.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
-				if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
-				{
-					return null;  // Log if needed: "Invalid or missing user ID claim."
-				}
-				var userResult = await _userService.GetById(userId);
-				return userResult.Entity;
-			}
-			catch (Exception ex)
-			{
-				 _logger.LogError(ex, "Failed to extract user from claims.");
-				return null;
-			}
-		}
 		
 		public IReturnObject<int> GetUserIdFromJwt(string token)
 		{
 			if(string.IsNullOrWhiteSpace(token)) return new ReturnObject<int>().BadRequest("Invalid Token");
 
-			var x = _jwt.ValidateToken(token, new TokenType(){ Name = "access"});
+			var claims = _jwt.ValidateToken(token, new TokenType(){ Name = "access"});
 
-			var userIdString = x.Claims.FirstOrDefault(c => c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value;
+			var userIdString = claims?.Claims.FirstOrDefault(c => c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value;
 
 			return int.TryParse(userIdString, out var userId) ? 
 				new ReturnObject<int>().Ok(userId) : 
