@@ -27,7 +27,7 @@ public partial class Product
 
     public decimal Rating { get; set; }
 
-    public int Category { get; set; }
+    public int? Category { get; set; }
 
     public virtual ICollection<CartProduct> CartProducts { get; set; } = new List<CartProduct>();
 

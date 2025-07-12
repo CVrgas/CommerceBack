@@ -1,6 +1,6 @@
 namespace CommerceBack.DTOs.Product;
 
-public class ProductUpdateDto
+public class ProductCreateUpdateDto
 {
     public int Id { get; set; }
     public decimal? Price { get; set; }
