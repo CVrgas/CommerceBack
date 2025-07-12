@@ -12,6 +12,9 @@ public class MappingProfile : Profile
         // Product
         CreateMap<ProductDto, Product>();
         CreateMap<Product, ProductDto>();
+        CreateMap<Product, ProductCreateUpdateDto>();
+        CreateMap<ProductCreateUpdateDto, Product>()
+            .ForMember(dest => dest.Category, opt => opt.Ignore());
         CreateMap<PaginatedResponse<ProductDto>, PaginatedResponse<Product>>();
         CreateMap<PaginatedResponse<Product>, PaginatedResponse<ProductDto>>();
     }
