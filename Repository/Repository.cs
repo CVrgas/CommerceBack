@@ -53,7 +53,7 @@ namespace CommerceBack.Repository
             return Task.CompletedTask;
         }
 
-        public async Task<T?> GetById(int id, Func<IQueryable<T>, IQueryable<T>>[]? includes = null)
+        public async Task<T?> GetById(int id, Func<IQueryable<T>, IQueryable<T>>? includes = null)
         {
             var keyProp = _dbContext.Model.FindEntityType(typeof(T))?.FindPrimaryKey()?.Properties.FirstOrDefault()?.Name;
 
@@ -66,37 +66,80 @@ namespace CommerceBack.Repository
 
             if (includes == null) return await query.FirstOrDefaultAsync(e => EF.Property<int>(e, keyProp) == id);
             
-            query = includes.Aggregate(query, (current, include) => include(current));
+            query = includes(query);
             
             return await query.FirstOrDefaultAsync(e => EF.Property<int>(e, keyProp) == id);
         }
+        
+        public async Task<TProjection?> GetById<TProjection>(int id, Expression<Func<T, TProjection>> selector)
+        {
+            var keyProp = _dbContext.Model.FindEntityType(typeof(T))?.FindPrimaryKey()?.Properties.FirstOrDefault()?.Name;
 
-        public async Task<T?> Get(Expression<Func<T, bool>> predicate, Func<IQueryable<T>, IQueryable<T>>[]? includes = null)
+            if (keyProp == null)
+            {
+                throw new InvalidOperationException("Primary key not found.");
+            }
+
+            var query = _dbSet.AsQueryable();
+            
+            return await query.Where(e => EF.Property<int>(e, keyProp) == id).Select(selector).FirstOrDefaultAsync();
+        }
+
+        public async Task<T?> Get(Expression<Func<T, bool>> predicate, Func<IQueryable<T>, IQueryable<T>>? includes = null)
         {
             var query = _dbSet.AsQueryable();
 
             if (includes == null) return await query.FirstOrDefaultAsync(predicate);
-            query = includes.Aggregate(query, (current, include) => include(current));
+            query = includes(query);
 
             return await query.FirstOrDefaultAsync(predicate);
         }
+        
+        public async Task<TProjection?> Get<TProjection>(Expression<Func<T, bool>> predicate, Expression<Func<T, TProjection>> selector)
+        {
+            return await _dbSet
+                .Where(predicate)
+                .Select(selector)
+                .FirstOrDefaultAsync();
+        }
 
-        public async Task<IEnumerable<T>> GetAll(Expression<Func<T, bool>>? predicate = null, Expression<Func<T, object>>? orderBy = null, Func<IQueryable<T>, IQueryable<T>>[]? includes = null)
+        public async Task<IEnumerable<T>> GetAll(
+            Expression<Func<T, bool>>? predicate = null, 
+            Func<IQueryable<T>, IOrderedQueryable<T>>? orderBy = null, 
+            Func<IQueryable<T>, IQueryable<T>>? includes = null, 
+            int? take = null)
         {
             var query = _dbSet.AsQueryable();
 
             if (includes != null)
             {
-                foreach (var include in includes)
-                {
-                    query = include(query);
-                }
+                query = includes(query);
             }
 
             if (orderBy != null)
-                query = query.OrderBy(orderBy);
+                query = orderBy(query);
+            
+            if (take != null)
+                query = query.Take(take.Value);
 
             return await query.Where(predicate ?? (p => true)).ToListAsync();
+        }
+        
+        public async Task<IEnumerable<TProjection>> GetAll<TProjection>(
+            Expression<Func<T, TProjection>> selector,
+            Expression<Func<T, bool>>? predicate = null, 
+            Func<IQueryable<T>, IOrderedQueryable<T>>? orderBy = null, 
+            int? take = null)
+        {
+            var query = _dbSet.AsQueryable();
+
+            if (orderBy != null)
+                query = orderBy(query);
+            
+            if (take != null)
+                query = query.Take(take.Value);
+
+            return await query.Where(predicate ?? (p => true)).Select(selector).ToListAsync();
         }
 
         public Task<T> Update(T entity)
@@ -150,7 +193,7 @@ namespace CommerceBack.Repository
             return await _dbSet.AnyAsync(e => EF.Property<int>(e, keyProp) == id);
         }
 
-        public async Task<PaginatedResponse<T>> GetPaginated(int pageIndex, int pageSize, Expression<Func<T, bool>>? predicate = null, Expression<Func<T, object>>? orderBy = null, Func<IQueryable<T>, IQueryable<T>>[]? includes = null)
+        public async Task<PaginatedResponse<T>> GetPaginated(int pageIndex, int pageSize, Expression<Func<T, bool>>? predicate = null, Func<IQueryable<T>, IOrderedQueryable<T>>? orderBy = null, Func<IQueryable<T>, IQueryable<T>>? includes = null)
         {
             var query = _dbSet.AsQueryable();
 
@@ -160,11 +203,11 @@ namespace CommerceBack.Repository
                 query = query.Where(predicate);
 
             if(orderBy != null)
-                query = query.OrderBy(orderBy);
+                query = orderBy(query);
 
             if(includes != null)
             {
-                query = includes.Aggregate(query, (current, include) => include(current));
+                query = includes(query);
             }
 
             var filtered = query.Count();
@@ -179,5 +222,34 @@ namespace CommerceBack.Repository
                 Entities = entities
             };
         }
-	}
+        public async Task<PaginatedResponse<TProjection>> GetPaginated<TProjection>(
+            int pageIndex, int pageSize,
+            Expression<Func<T, TProjection>> selector,
+            Expression<Func<T, bool>>? predicate = null, 
+            Func<IQueryable<T>, IOrderedQueryable<T>>? orderBy = null)
+        {
+            var query = _dbSet.AsQueryable();
+
+            var totalCount = query.Count();
+
+            if(predicate != null)
+                query = query.Where(predicate);
+
+            if(orderBy != null)
+                query = orderBy(query);
+
+            var filtered = query.Count();
+            var entities = await query.Skip((pageIndex - 1) * pageSize).Take(pageSize).Select(selector).ToListAsync();
+
+            return new PaginatedResponse<TProjection>()
+            {
+                PageNumber = pageIndex,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                TotalFiltered = filtered,
+                Entities = entities
+            };
+        }
+        
+    }
 }
