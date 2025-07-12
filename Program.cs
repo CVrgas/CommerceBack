@@ -102,9 +102,9 @@ builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddScoped<ProductService>();
 
-builder.Services.AddScoped<AuthService>();
-
 builder.Services.AddScoped<UserService>();
+
+builder.Services.AddScoped<AuthService>();
 
 builder.Services.AddScoped<TokenService>();
 
