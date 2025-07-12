@@ -16,28 +16,55 @@ namespace CommerceBack.Controllers
     public class ProductController(ProductService service, IMapper mapper) : ControllerBase
     {
         [HttpGet]
-        public async Task<IActionResult> All(string? query, string? orderby, string? orderDirection)
+        public async Task<IActionResult> All(string? query, string? filter, string? orderby, string? orderDirection)
         {
-            Expression<Func<Product, bool>> predicate =
-                !string.IsNullOrWhiteSpace(query)
-                    ? p => EF.Functions.Like(p.Name!.ToLower(), $"%{query.ToLower()}%") ||
-                           EF.Functions.Like(p.Description!.ToLower(), $"%{query.ToLower()}%") ||
-                           EF.Functions.Like( p.CategoryNavigation.Name!.ToLower().Replace(" ", ""), $"%{query.ToLower()}%")
-                    : p => true;
-            
-            Expression<Func<Product, object>> order = p => p.Name!;
+            var normalizedFilterList = new List<string>();
+            if (!string.IsNullOrEmpty(filter))
+            {
+                normalizedFilterList = filter
+                    .Split(';')
+                    .ToList();
+            }
 
-            Func<IQueryable<Product>, IQueryable<Product>>[]? inc = null;
+            Expression<Func<Product, bool>> predicate =
+                p =>
+                    // Si query tiene valor, buscar en Name o Description (case-insensitive)
+                    (string.IsNullOrEmpty(query) ||
+                     EF.Functions.Like(p.Name!.ToLower(), $"%{query.ToLower()}%") ||
+                     EF.Functions.Like(p.Description!.ToLower(), $"%{query.ToLower()}%"))
+                    // Si normalizedFilterList tiene elementos, filtrar por nombre de categoría
+                    &&
+                    (normalizedFilterList.Count == 0 ||
+                     (p.Category != null && normalizedFilterList.Contains(p.Category.ToString()!)));
+
+            Func<IQueryable<Product>, IOrderedQueryable<Product>>? order = q => q.OrderBy(p => p.Name!);
             
-            var result  = await service.GetAll(predicate, order, inc);
+            var result  = await service.GetAll(predicate, order);
+
+            if (result.Entity != null)
+            {
+                foreach (var p in result.Entity)
+                {
+                    p.ImageUrl ??= "https://placehold.co/600x400";
+                }
+            }
+            
             return StatusCode((int)result.Code,
                 result.IsOk ? mapper.Map<IEnumerable<ProductDto>>(result.Entity) : result.Message);
+        }
+
+        [HttpGet("feature")]
+        public async Task<IActionResult> GetFeature(int count = 3)
+        {
+            var result = await service.GetFeatureProduct(count);
+            return StatusCode((int)result.Code, result.IsOk ? mapper.Map<IEnumerable<ProductDto>>(result.Entity) : result.Message);
         }
 
         [HttpGet("{productId}")]
         public async Task<IActionResult> Get(int productId)
         {
             var result = await service.GetById(productId);
+            if (result.Entity != null) result.Entity.ImageUrl ??= "https://placehold.co/600x400";
             return StatusCode((int)result.Code, result.IsOk ? mapper.Map<ProductDto>(result.Entity!) : result.Message);
         }
 
@@ -47,12 +74,15 @@ namespace CommerceBack.Controllers
         {
             try
             {
-                Expression<Func<Product,bool>>? predicate  = p => (query != null && (p.Name.Contains(query) || p.Description.Contains(query)));
-                Expression<Func<Product, object>>? orderBy = order!.ToLower() switch {
-                    "name" => p => p.Name!,
-                    "description" => p => p.Description!,
-                    "price" => p => p.Price!,
-                    _ => p => p.Name!,
+                Expression<Func<Product, bool>>? predicate = 
+                    p => (query == null || (p.Name.Contains(query) || p.Description.Contains(query)));
+                
+                Func<IQueryable<Product>, IOrderedQueryable<Product>>? orderBy = order?.ToLower() switch
+                {
+                    "name" => q => q.OrderBy(p => p.Name),
+                    "description" => q => q.OrderBy(p => p.Description),
+                    "price" => q => q.OrderBy(p => p.Price),
+                    _ => q => q.OrderBy(p => p.Name),
                 };
                 
                 var result = await service.GetPaginated(pageIndex, pageSize, predicate, orderBy, null);
@@ -74,7 +104,7 @@ namespace CommerceBack.Controllers
 
         //[Authorize]
         [HttpPost("[action]")]
-        public async Task<IActionResult> Create(ProductCreateDto model)
+        public async Task<IActionResult> Create(ProductCreateUpdateDto model)
         {
             if (!ModelState.IsValid)
             {
@@ -86,7 +116,7 @@ namespace CommerceBack.Controllers
 
         //[Authorize]
         [HttpPost("[action]")]
-        public async Task<IActionResult> CreateMany(IEnumerable<ProductCreateDto> models)
+        public async Task<IActionResult> CreateMany(IEnumerable<ProductCreateUpdateDto> models)
         {
             if (!ModelState.IsValid)
             {
@@ -100,20 +130,21 @@ namespace CommerceBack.Controllers
 
         //[Authorize]
         [HttpPost("[action]")]
-        public async Task<IActionResult> Update(ProductUpdateDto model)
+        public async Task<IActionResult> Update(ProductCreateUpdateDto model)
         {
             if (!ModelState.IsValid)
             {
                 return BadRequest();
             }
 
-            var productObject = await service.GetById(model.Id);
+            var existedProduct = await service.GetById(model.Id);
 
-            if (!productObject.IsOk) return StatusCode((int)productObject.Code, productObject.Message);
+            if (!existedProduct.IsOk || existedProduct.Entity == null)
+                return StatusCode((int)existedProduct.Code, existedProduct.Message);
+ 
+            var product = existedProduct.Entity;
 
-            var product = productObject.Entity;
-
-            product!.Name = model.Name ?? product.Name;
+            product.Name = model.Name ?? product.Name;
             product.Description = model.Description ?? product.Description;
             product.Price = model.Price ?? product.Price;
             product.ImageUrl = model.ImageUrl ?? product.ImageUrl;
@@ -125,7 +156,7 @@ namespace CommerceBack.Controllers
 
         //[Authorize]
         [HttpPost("[action]")]
-        public async Task<IActionResult> UpdateMany(List<ProductUpdateDto> models)
+        public async Task<IActionResult> UpdateMany(List<ProductCreateUpdateDto> models)
         {
             if (!ModelState.IsValid)
             {
@@ -195,5 +226,19 @@ namespace CommerceBack.Controllers
             var result = await service.Rate(productId, newRate);
             return StatusCode((int)result.Code, result.IsOk ? result.Entity : result.Message);
         }
+
+        [HttpGet("[action]")]
+        public async Task<IActionResult> GetSelector()
+        {
+            var response = await service.GetAll<object>(p => new { p.Name, p.Id, Categoria = p.CategoryNavigation.Name});
+            return response.IsOk ? Ok(response.Entity) : StatusCode((int)response.Code, response.Message);
+        }
+    }
+
+    public class CustomProductDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public decimal Price { get; set; }
     }
 }
