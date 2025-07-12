@@ -6,7 +6,7 @@ namespace CommerceBack.Services
 {
 	public class UserService : CrudService<User>
 	{
-		protected UserService(ILogger<CrudService<User>> logger, IUnitOfWork unitOfWork) : base(logger, unitOfWork)
+		public UserService(ILogger<CrudService<User>> logger, IUnitOfWork unitOfWork) : base(logger, unitOfWork)
 		{
 		}
 	}

@@ -19,12 +19,10 @@ public class UserController(UserService service) : Controller
     [HttpGet("{id}")]
     public async Task<IActionResult> Get(int id)
     {
-        Func<IQueryable<User>,IQueryable<User>>[] includes =
-        [
-            query => query
-                .Include(u => u.CartNavigation)
-                    .ThenInclude( c => c!.CartProducts),
-        ];
+        Func<IQueryable<User>,IQueryable<User>> includes = query => 
+            query.Include(u => u.CartNavigation)
+                    .ThenInclude( c => c!.CartProducts);
+        
         var result = await service.GetById(id, includes);
         return result.IsOk ? StatusCode((int)result.Code, result.Entity) : StatusCode((int)result.Code, result.Message); 
     }

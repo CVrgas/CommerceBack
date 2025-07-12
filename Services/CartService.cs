@@ -153,10 +153,7 @@ public class CartService
     {
         try
         {
-            Func<IQueryable<Cart>, IQueryable<Cart>>[]? includes =
-            [
-                u => u.Include(c => c.CartProducts).ThenInclude( cp => cp.Products)
-            ];
+            Func<IQueryable<Cart>, IQueryable<Cart>>? includes = u => u.Include(c => c.CartProducts).ThenInclude(cp => cp.Products);
             var result = await _cartService.Find(cart => cart.UserId == userId, includes);
             return result;
         }

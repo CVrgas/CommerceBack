@@ -92,9 +92,9 @@ namespace CommerceBack.Services
 			try
 			{
 				// Get user using credential
-				var result = await _userService.Find(u => u.Email == credential || u.Username == credential, [
+				var result = await _userService.Find(u => u.Email == credential || u.Username == credential,
 					query => query.Include(u => u.RoleNavigation)
-				]);
+				);
 				var responseObject = new ReturnObject<UserDto>();
 
 				// if user not found. prevent login
