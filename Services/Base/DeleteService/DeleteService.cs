@@ -3,7 +3,7 @@ using CommerceBack.UnitOfWork;
 
 namespace CommerceBack.Services.Base.DeleteService;
 
-public abstract class DeleteService<T> : IDeleteService<T> where T : class
+public class DeleteService<T> : IDeleteService<T> where T : class
 {
     private readonly ILogger<DeleteService<T>> _logger;
     private readonly IUnitOfWork _unitOfWork;

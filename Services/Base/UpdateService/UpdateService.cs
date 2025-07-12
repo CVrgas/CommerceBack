@@ -3,7 +3,7 @@ using CommerceBack.UnitOfWork;
 
 namespace CommerceBack.Services.Base.UpdateService;
 
-public abstract class UpdateService<T> : IUpdateService<T> where T : class
+public class UpdateService<T> : IUpdateService<T> where T : class
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<UpdateService<T>> _logger;

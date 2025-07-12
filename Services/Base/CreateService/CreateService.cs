@@ -4,7 +4,7 @@ using CommerceBack.UnitOfWork;
 
 namespace CommerceBack.Services.Base.CreateService;
 
-public abstract class CreateService<T> : ICreateService<T> where T : class
+public class CreateService<T> : ICreateService<T> where T : class
 {
     private readonly ILogger<CreateService<T>> _logger;
     private readonly IUnitOfWork _unitOfWork;

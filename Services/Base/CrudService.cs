@@ -1,23 +1,23 @@
 using System.Linq.Expressions;
 using CommerceBack.Common;
 using CommerceBack.Common.OperationResults;
+using CommerceBack.Services.Base.CreateService;
 using CommerceBack.UnitOfWork;
 
 namespace CommerceBack.Services.Base;
 
-public class CrudService<T> : ICrudService<T>
-    where T : class
+public class CrudService<T> : IReadService<T>, ICreateService<T>, IUpdateService<T>, IDeleteService<T> where T : class
 {
     private readonly ILogger<CrudService<T>> _logger;
     private readonly IUnitOfWork _unitOfWork;
 
-    protected CrudService(ILogger<CrudService<T>> logger, IUnitOfWork unitOfWork)
+    public CrudService(ILogger<CrudService<T>> logger, IUnitOfWork unitOfWork)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
     }
 
-    public virtual async Task<IReturnObject<T>> GetById(int id, Func<IQueryable<T>, IQueryable<T>>[]? includes = null!)
+    public virtual async Task<IReturnObject<T>> GetById(int id, Func<IQueryable<T>, IQueryable<T>>? includes = null!)
     {
         try
         {
@@ -31,7 +31,12 @@ public class CrudService<T> : ICrudService<T>
         }
     }
 
-    public virtual async Task<IReturnObject<T>> Find(Expression<Func<T, bool>> predicate, Func<IQueryable<T>, IQueryable<T>>[]? includes = null!)
+    public Task<IReturnObject<TProjection>> GetById<TProjection>(int id, Expression<Func<T, TProjection>> selector)
+    {
+        throw new NotImplementedException();
+    }
+
+    public virtual async Task<IReturnObject<T>> Find(Expression<Func<T, bool>> predicate, Func<IQueryable<T>, IQueryable<T>>? includes = null!)
     {
         try
         {
@@ -45,7 +50,7 @@ public class CrudService<T> : ICrudService<T>
         }
     }
 
-    public virtual async Task<IReturnObject<IEnumerable<T>>> GetAll(Expression<Func<T, bool>>? predicate = null, Expression<Func<T, object>>? orderBy = null, Func<IQueryable<T>, IQueryable<T>>[]? includes = null)
+    public virtual async Task<IReturnObject<IEnumerable<T>>> GetAll(Expression<Func<T, bool>>? predicate = null, Func<IQueryable<T>, IOrderedQueryable<T>>? orderBy = null, Func<IQueryable<T>, IQueryable<T>>? includes = null)
     {
         try
         {
@@ -58,10 +63,24 @@ public class CrudService<T> : ICrudService<T>
             return new ReturnObject<IEnumerable<T>>().InternalError();
         }
     }
-    
+
+    public async Task<IReturnObject<IEnumerable<TProjection>>> GetAll<TProjection>(Expression<Func<T, TProjection>> selector, Expression<Func<T, bool>>? predicate = null, Func<IQueryable<T>, IOrderedQueryable<T>>? orderBy = null)
+    {
+        try
+        {
+            var objects = await _unitOfWork.Repository<T>().GetAll(selector, predicate, orderBy);
+            return new ReturnObject<IEnumerable<TProjection>>().Ok(objects);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, ex.Message);
+            return new ReturnObject<IEnumerable<TProjection>>().InternalError();
+        }
+    }
+
     public virtual async Task<IReturnObject<PaginatedResponse<T>>> GetPaginated(int pageIndex, int pageSize,
-        Expression<Func<T, bool>>? predicate = null, Expression<Func<T, object>>? orderBy = null,
-        Func<IQueryable<T>, IQueryable<T>>[]? includes = null)
+        Expression<Func<T, bool>>? predicate = null, Func<IQueryable<T>, IOrderedQueryable<T>>? orderBy = null,
+        Func<IQueryable<T>, IQueryable<T>>? includes = null)
     {
         try
         {
@@ -72,6 +91,21 @@ public class CrudService<T> : ICrudService<T>
         {
             _logger.LogError(ex, ex.Message);
             return new ReturnObject<PaginatedResponse<T>>().InternalError();
+        }
+    }
+
+    public virtual async Task<IReturnObject<PaginatedResponse<TProjection>>> GetPaginated<TProjection>(int pageIndex, int pageSize, Expression<Func<T, TProjection>> selector, Expression<Func<T, bool>>? predicate = null,
+        Func<IQueryable<T>, IOrderedQueryable<T>>? orderBy = null)
+    {
+        try
+        {
+            var paginated = await _unitOfWork.Repository<T>().GetPaginated(pageIndex, pageSize,selector, predicate, orderBy);
+            return new ReturnObject<PaginatedResponse<TProjection>>().Ok(paginated);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, ex.Message);
+            return new ReturnObject<PaginatedResponse<TProjection>>().InternalError();
         }
     }
 
@@ -98,7 +132,7 @@ public class CrudService<T> : ICrudService<T>
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error while checking if entity exists");
+            _logger.LogError(ex, $"Error while checking if {typeof(T).Name} exists");
             throw;
         }
     }
@@ -111,7 +145,7 @@ public class CrudService<T> : ICrudService<T>
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error while checking if entity exists with id {id}");
+            _logger.LogError(ex, $"Error while checking if {typeof(T).Name} exists with id {id}");
             throw;
         }
     }
@@ -121,10 +155,10 @@ public class CrudService<T> : ICrudService<T>
         await _unitOfWork.BeginTransactionAsync();
         try
         {
-            var exists = await this.Exist(e => e.Equals(entity));
+            var exists = await Exist(e => e.Equals(entity));
             if (exists)
             {
-                return new ReturnObject<T>().BadRequest("Entity already exists");
+                return new ReturnObject<T>().BadRequest($"{typeof(T).Name} already exists");
             }
 
             var createdEntity = await _unitOfWork.Repository<T>().Create(entity);
@@ -136,9 +170,9 @@ public class CrudService<T> : ICrudService<T>
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while creating the entity");
+            _logger.LogError(ex, $"An error occurred while creating {typeof(T).Name}");
             await _unitOfWork.RollbackAsync();
-            return new ReturnObject<T>().InternalError("An error occurred while creating the entity");
+            return new ReturnObject<T>().InternalError($"An error occurred while creating {typeof(T).Name}");
         }
     }
     
@@ -161,13 +195,13 @@ public class CrudService<T> : ICrudService<T>
         try
         {
             var createdEntity = await _unitOfWork.Repository<T>().Update(entity);
-
+            await _unitOfWork.SaveChangesAsync();
             return new ReturnObject<T>().Ok(createdEntity);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while updating the entity");
-            return new ReturnObject<T>().InternalError("An error occurred while updating the entity");
+            _logger.LogError(ex, $"An error occurred while updating {typeof(T).Name}");
+            return new ReturnObject<T>().InternalError($"An error occurred while updating {typeof(T).Name}");
         }
     }
     
@@ -208,8 +242,8 @@ public class CrudService<T> : ICrudService<T>
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while deleting the entity");
-            return new ReturnObject<T>().InternalError("An error occurred while deleting the entity");
+            _logger.LogError(ex, $"An error occurred while deleting {typeof(T).Name}");
+            return new ReturnObject<T>().InternalError($"An error occurred while deleting {typeof(T).Name}");
         }
     }
     
@@ -225,8 +259,8 @@ public class CrudService<T> : ICrudService<T>
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while deleting the entity");
-            return new ReturnObject<T>().InternalError("An error occurred while deleting the entity");
+            _logger.LogError(ex, $"An error occurred while deleting {typeof(T).Name}");
+            return new ReturnObject<T>().InternalError($"An error occurred while deleting {typeof(T).Name}");
         }
     }
     
@@ -250,5 +284,20 @@ public class CrudService<T> : ICrudService<T>
             .FirstOrDefault(p => Attribute.IsDefined(p, typeof(System.ComponentModel.DataAnnotations.KeyAttribute)));
 
         return keyProperty?.GetValue(entity);
+    }
+    
+    public virtual async Task<IReturnObject<TProjection?>> Get<TProjection>(Expression<Func<T, bool>> predicate, Expression<Func<T, TProjection>> selector)
+    {
+        try
+        {
+            var result =  await _unitOfWork.Repository<T>().Get(predicate, selector);
+            if(result  == null) return new ReturnObject<TProjection?>().NotFound();
+            return new ReturnObject<TProjection?>().Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error");
+            return new ReturnObject<TProjection?>().InternalError();
+        }
     }
 }
