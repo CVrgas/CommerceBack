@@ -6,18 +6,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CommerceBack.Services;
 
-public class CartService
+public class CartService : CrudService<Cart>
 {
-    private readonly ICrudService<Cart> _cartService;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<CartService> _logger;
     private readonly ICrudService<Product> _productService;
     private readonly ICrudService<CartProduct> _cartProductService;
-    private readonly IReadService<User> _userService;
-    private readonly ILogger<CartService> _logger;
+    private readonly UserService _userService;
     
-    public CartService( ILogger<CartService> logger, ICrudService<Cart> cartService, ICrudService<Product> productService, ICrudService<CartProduct> cartProductService, ICrudService<User> userService)
+    public CartService(IUnitOfWork unitOfWork, ILogger<CartService> logger, ICrudService<Product> productService, ICrudService<CartProduct> cartProductService, UserService userService) 
+        : base(logger, unitOfWork)
     {
+        _unitOfWork = unitOfWork;
         _logger = logger;
-        _cartService = cartService;
         _productService = productService;
         _cartProductService = cartProductService;
         _userService = userService;
@@ -136,7 +137,7 @@ public class CartService
                 UserId = userId,
             };
 
-            var createResult = await _cartService.Create(newCart);
+            var createResult = await base.Create(newCart);
             return !createResult.IsOk ? new ReturnObject<int>(createResult) : new ReturnObject<int>().Ok(createResult.Entity!.Id);
         }
         catch (Exception ex)
@@ -147,14 +148,14 @@ public class CartService
     }
     private async Task<int> GetCartByUserId(int userId)
     {
-        return (await _cartService.Find(c => c.UserId == userId)).Entity?.Id ?? 0;
+        return (await base.Find(c => c.UserId == userId)).Entity?.Id ?? 0;
     }
     public async Task<IReturnObject<Cart>> Get(int userId)
     {
         try
         {
             Func<IQueryable<Cart>, IQueryable<Cart>>? includes = u => u.Include(c => c.CartProducts).ThenInclude(cp => cp.Products);
-            var result = await _cartService.Find(cart => cart.UserId == userId, includes);
+            var result = await base.Find(cart => cart.UserId == userId, includes);
             return result;
         }
         catch (Exception ex)

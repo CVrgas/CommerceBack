@@ -6,7 +6,7 @@ using CommerceBack.UnitOfWork;
 
 namespace CommerceBack.Services.Base;
 
-public class CrudService<T> : IReadService<T>, ICreateService<T>, IUpdateService<T>, IDeleteService<T> where T : class
+public class CrudService<T> : ICrudService<T> where T : class
 {
     private readonly ILogger<CrudService<T>> _logger;
     private readonly IUnitOfWork _unitOfWork;

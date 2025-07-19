@@ -1,6 +1,4 @@
-﻿using System.Net;
-using System.Security.Principal;
-using AutoMapper;
+﻿using AutoMapper;
 using CommerceBack.Common.OperationResults;
 using CommerceBack.DTOs.Product;
 using CommerceBack.Entities;

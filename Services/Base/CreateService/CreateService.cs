@@ -67,12 +67,4 @@ public class CreateService<T> : ICreateService<T> where T : class
             throw;
         }
     }
-    
-    private object? GetPrimaryKeyValue(T entity)
-    {
-        var keyProperty = typeof(T).GetProperties()
-            .FirstOrDefault(p => Attribute.IsDefined(p, typeof(System.ComponentModel.DataAnnotations.KeyAttribute)));
-
-        return keyProperty?.GetValue(entity);
-    }
 }
